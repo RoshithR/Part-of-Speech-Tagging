@@ -114,7 +114,9 @@ def hmm_ve(image):
     first = True
     tau = 0.0
     prev_tag = None
+    count =0
     for character in load_letters(image):
+        count += 1
         word_dict = char_prob(character)
         max_tau = 1000
         max_prev_tag = None
@@ -142,18 +144,31 @@ def hmm_ve(image):
                     max_prev_tag = key
 
             else:
-                if state_transitions[key][prev_tag] >= 1:
+                if state_transitions[key][prev_tag]:
+                    prob = - (0.01 * math.log(state_transitions[key][prev_tag] /
+                                      state_transitions[key]["total"])) \
+                           - math.log(word_dict[key]) + tau
                     # print("key: ", key, "\tprev_tag: ", prev_tag)
                     # print("State_transition count: ", state_transitions[key][prev_tag])
                     # print("State_transition total: ", state_transitions[key]["total"])
-                    # print("Word_dict: ", word_dict[key])
+                    # print("State_transition prob: ", - math.log(state_transitions[key][prev_tag] /
+                    #                                             state_transitions[key]["total"]))
+                    # print("Word_dict: ", -math.log(word_dict[key]))
+                    # print("Prob: ", prob)
                     # print("Tau: ", tau)
-                    prob = - math.log(state_transitions[key][prev_tag] /
-                                      state_transitions[key]["total"]) \
-                           - math.log(word_dict[key]) + tau
+
                 else:
-                    prob = - math.log(undef_prob) \
-                           - math.log(word_dict[key]) + tau
+                    if word_dict[key]:
+                        prob = - (0.01 * math.log(undef_prob)) \
+                               - math.log(word_dict[key]) + tau
+
+                    # print("=======================================No Transitions===================================")
+                    # print("key: ", key, "\tprev_tag: ", prev_tag)
+                    # print("undef_prob: ", -math.log(undef_prob))
+                    # print("Word_dict: ", -math.log(word_dict[key]))
+                    # print("Prob: ", prob)
+                    # print("Tau: ", tau)
+                    # print("=======================================No Transitions===================================")
 
                 # if character in word_dict[key]:
                 #     if prev_tag in state_transitions[key]:
@@ -178,7 +193,11 @@ def hmm_ve(image):
 
         tau = max_tau
         prev_tag = max_prev_tag
+        # print("tau: ", max_tau)
+        # print("prev_tag: ", prev_tag)
         ans.append(prev_tag)
+        if count == -1:
+            break
 
         first = False
     return ans
@@ -209,18 +228,25 @@ def hmm_viterbi(image):
             adj_list = []
             for k in tags:
 
-                # if state_transitions[key][k] <= undef_prob:
-                #     state_transitions[key][k] = undef_prob
-                adj_list.append((adjacency_list[str(i - 1)][k][0] +
-                                 math.log(state_transitions[key][k] /
-                                          state_transitions[key]['total']) +
-                                 -math.log(word_dict[key]), k, sentence[i]))
-                if k == 's':
-                    print("key: ", key, "\tk: ", k)
-                    print("State_transition count: ", state_transitions[key][k])
-                    print("State_transition total: ", state_transitions[key]["total"])
-                    print("Word_dict: ", word_dict[key])
-                    print("Tau: ", tau)
+                if not state_transitions[key][k]:
+                    adj_list.append((adjacency_list[str(i - 1)][k][0] -
+                                     (0.01 * math.log(undef_prob)) +
+                                     -math.log(word_dict[key]), k, sentence[i]))
+
+                else:
+                    adj_list.append((adjacency_list[str(i - 1)][k][0] -
+                                     (0.01 * math.log(state_transitions[key][k] /
+                                                    state_transitions[key]['total'])) +
+                                     -math.log(word_dict[key]), k, sentence[i]))
+                # if k == '0':
+                #     print("adjacency_list[str(i - 1)][k][0]: ", adjacency_list[str(i - 1)][k][0])
+                #     print("key: ", key, "\tk: ", k)
+                #     print("State_transition count: ", state_transitions[key][k])
+                #     print("State_transition total: ", state_transitions[key]["total"])
+                #     # print("State_transition prob: ", state_transitions[key][k] / state_transitions[key]["total"])
+                #     print("Word_dict: ", word_dict[key])
+                #     # print("Prob: ", word_dict[key] * (state_transitions[key][k] / state_transitions[key]["total"]))
+
 
                 # if sentence[i] in word_dict[key]:
                 #     if k not in state_transitions[key]:
@@ -300,28 +326,28 @@ train_string = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789()
 tags = [char for char in train_string]
 print(tags)
 
-
 undef_prob = 0.0000000001
-tag_dict = {"total": undef_prob}
+zero = 0
+tag_dict = {"total": zero}
 state_transitions = {}
-initial_tags = {"total": undef_prob}
+initial_tags = {"total": zero}
 initial_state_distribution = {}
 priors = {}
 adjacency_list = {'0': {}}
 for tag_variable in tags:
 
-    tag_dict[tag_variable] = undef_prob
+    tag_dict[tag_variable] = zero
 
-    initial_tags[tag_variable] = undef_prob
-    initial_state_distribution[tag_variable] = undef_prob
+    initial_tags[tag_variable] = zero
+    initial_state_distribution[tag_variable] = zero
 
-    state_transitions[tag_variable] = {'total': undef_prob}
+    state_transitions[tag_variable] = {'total': zero}
     for t in tags:
-        state_transitions[tag_variable][t] = undef_prob
+        state_transitions[tag_variable][t] = zero
 
 train(train_txt_fname)
-# print(state_transitions)
-# exit(69)
+print(state_transitions)
+
 # test_img_fname = train_img_fname
 print("\n\nNaive Bayes")
 print_string(simplified(test_img_fname))

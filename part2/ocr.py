@@ -211,10 +211,16 @@ def hmm_viterbi(image):
 
                 # if state_transitions[key][k] <= undef_prob:
                 #     state_transitions[key][k] = undef_prob
-                adj_list.append((adjacency_list[str(i - 1)][k][0] -
+                adj_list.append((adjacency_list[str(i - 1)][k][0] +
                                  math.log(state_transitions[key][k] /
                                           state_transitions[key]['total']) +
                                  -math.log(word_dict[key]), k, sentence[i]))
+                if k == 's':
+                    print("key: ", key, "\tk: ", k)
+                    print("State_transition count: ", state_transitions[key][k])
+                    print("State_transition total: ", state_transitions[key]["total"])
+                    print("Word_dict: ", word_dict[key])
+                    print("Tau: ", tau)
 
                 # if sentence[i] in word_dict[key]:
                 #     if k not in state_transitions[key]:

@@ -13,6 +13,7 @@ import pandas as pd
 import sys
 import time
 import pickle
+import math
 from pathlib import Path
 
 CHARACTER_WIDTH = 14
@@ -55,6 +56,132 @@ def load_training_letters(fname):
     letter_images = load_letters(fname)
     return {TRAIN_LETTERS[i]: letter_images[i] for i in range(0, len(TRAIN_LETTERS))}
 
+def train():
+    global state_transitions
+    global initial_tags
+    global initial_state_distribution
+    global tag_dict
+    global priors
+    with open('Iliad.txt', 'r') as file:
+        for line in file:
+            for index,character in enumerate(str(line)):
+                if str(character) in tags:
+                    tag_dict[character]+=1
+                    tag_dict["total"] += 1
+
+                    if index==0:
+                        if (character) in tags:
+                            initial_tags[character]+=1
+                            initial_tags["total"]+=1
+                    if index>0:
+                        if (str(line)[index-1]) in tags:
+                            try:
+                                state_transitions[str(character)][(str(line)[index-1])]+=1
+                                state_transitions[str(character)]['total']+=1
+                            except KeyError:
+                                pass
+    for key in tags:
+        priors[key] = tag_dict[key] / tag_dict["total"]
+        initial_state_distribution[key]=initial_tags[key] / initial_tags["total"]
+
+def simplified(image):
+    final_pos = []
+    for character in load_letters(image):
+        print_letter(character)
+        pos = {}
+        word_dict =char_prob(character)
+        # print(word_dict)
+        for tag in tags:
+            pos[tag] = 100000
+        for key in tags:
+
+            # print(key)
+            # P = - math.log(word_dict[key]) \
+            #     - math.log(priors[key])
+            P = - math.log(word_dict[key])
+            # print("key: ", key)
+            # print(word_dict[key])
+            # print(priors[key])
+            # print("\n\n\n")
+            # if str(character) in char_prob(key):
+            #     P = - math.log(char_prob(key)[str(character)]) \
+            #         - math.log(priors[key])
+            # else:
+            #     P = -math.log(0.0000000001)
+            pos[key] = P
+        # print(pos)
+        final_pos.append(min(pos.items(), key=operator.itemgetter(1))[0])
+        # break
+    print(final_pos)
+    return final_pos
+
+
+def hmm_ve(image):
+    ans = []
+    first = True
+    tau = 0.0
+    prev_tag = None
+    for character in load_letters(image):
+        word_dict = char_prob(character)
+        max_tau = 1000
+        max_prev_tag = None
+
+        for key in tags:
+            if first:
+                # prob = -math.log(initial_state_distribution[key] *
+                #                  word_dict[key])
+
+                prob = -math.log(word_dict[key])
+
+
+
+                # if character in word_dict[key]:
+                #     prob = -math.log(initial_state_distribution[key] *
+                #                      word_dict[key])
+                # else:
+                #     prob = -math.log(initial_state_distribution[key]) - math.log(undef_prob)
+
+                if prob < max_tau:
+                    max_tau = prob
+                    max_prev_tag = key
+
+            else:
+                if prev_tag in state_transitions[key]:
+                    prob = - math.log(state_transitions[key][prev_tag] /
+                                      state_transitions[key]["total"]) \
+                           - math.log(word_dict[key]) + tau
+                else:
+                    prob = - math.log(undef_prob) \
+                           - math.log(word_dict[key]) + tau
+
+                # if character in word_dict[key]:
+                #     if prev_tag in state_transitions[key]:
+                #         prob = - math.log(state_transitions[key][prev_tag] /
+                #                           state_transitions[key]["total"]) \
+                #                - math.log(word_dict[key]) + tau
+                #     else:
+                #         prob = - math.log(undef_prob) \
+                #                - math.log(word_dict[key]) + tau
+                # else:
+                #     if prev_tag in state_transitions[key]:
+                #         prob = - math.log(state_transitions[key][prev_tag] /
+                #                           state_transitions[key]["total"]) \
+                #                - math.log(undef_prob) + tau
+                #     else:
+                #         prob = - math.log(undef_prob) \
+                #                - math.log(undef_prob) + tau
+
+                if prob < max_tau:
+                    max_tau = prob
+                    max_prev_tag = key
+
+        tau = max_tau
+        prev_tag = max_prev_tag
+        ans.append(prev_tag)
+
+        first = False
+    return ans
+
 
 def print_letter(letter):
     print("\n".join([r for r in letter]))
@@ -62,10 +189,7 @@ def print_letter(letter):
 
 def similarity(char, tag):
     hit = 0
-    print(len(char))
-    print(tag)
     for i in range(len(char)):
-        print(i)
         if tag[i] == char[i]:
             hit += 1
     return hit / len(char)
@@ -82,8 +206,9 @@ def char_prob(char):
     for tag in tags:
         prob[tag] /= total
 
-    prob = sorted(prob.items(), key=operator.itemgetter(1))
+    # prob = sorted(prob.items(), key=operator.itemgetter(1))
     return prob
+
 
 
 def learn_hmm(fname):
@@ -170,6 +295,36 @@ tags = [char for char in train_string]
 print(tags)
 
 
+undef_prob = 0.0000000001
+tag_dict = {"total": 0.0000000001}
+state_transitions={}
+initial_tags={"total":0.0000000001}
+initial_state_distribution={}
+priors = {}
+for tag in tags:
+
+    tag_dict[tag] = 0.0000000001
+
+
+    initial_tags[tag]=0.0000000001
+    initial_state_distribution[tag]=0.0000000001
+
+    state_transitions[tag]={'total':0.0000000001}
+    for t in tags:
+        state_transitions[tag][t]=0.0000000001
+
+
+
+
+train()
+print(simplified(test_img_fname))
+
+print(hmm_ve(test_img_fname))
+# print(state_transitions)
+# print(initial_tags)
+# print(initial_state_distribution)
+
+
 # PS1, PSip1Si, PWiSi, PCount = learn_hmm(train_txt_fname)
 
 # Below is just some sample code to show you how the functions above work.
@@ -180,7 +335,7 @@ print(tags)
 #  dots are represented by *'s and white dots are spaces. For example,
 #  here's what "a" looks like:
 # print_letter(train_letters['a'])
-print(char_prob(test_letters[0]))
+# print(char_prob(test_letters[0]))
 # print(len(test_letters[0]))
 
 

@@ -15,11 +15,13 @@ from pos_scorer import Score
 from pos_solver import *
 import sys
 
+
 # Read in training or test data file
 #
 def read_data(fname):
     exemplars = []
     file = open(fname, 'r');
+    print("Encoding: ", file.encoding)
     for line in file:
         data = tuple([w.lower() for w in line.split()])
         exemplars += [ (data[0::2], data[1::2]), ]

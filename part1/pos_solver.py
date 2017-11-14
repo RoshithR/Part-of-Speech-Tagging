@@ -115,8 +115,8 @@ class Solver:
                         self.state_transitions[tag]["total"] += 1
 
         for key in self.tags:
-            self.priors[key]=self.tag_dict[key]/self.tag_dict["total"]
-            self.initial_state_distribution[key]=self.initial_tags[key]/self.initial_tags["total"]
+            self.priors[key] = self.tag_dict[key]/self.tag_dict["total"]
+            self.initial_state_distribution[key] = self.initial_tags[key]/self.initial_tags["total"]
 
         # print(self.tag_dict)
         # print(self.word_dict)

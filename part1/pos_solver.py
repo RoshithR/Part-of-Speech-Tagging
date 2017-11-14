@@ -9,7 +9,7 @@
 ####
 # Put your report here!!
 ####
-
+import heapq
 import random
 import math
 import operator
@@ -21,93 +21,226 @@ import operator
 #
 class Solver:
     def __init__(self):
-        #tag_dict maintains count of occurences of each tag and the total number of tags
-        self.tag_dict = {"adj": 0, "adv": 0, "adp": 0, "conj": 0, "det": 0, "noun": 0, "num": 0, "pron": 0, "prt": 0,"verb": 0, "x": 0, ".": 0, "total": 0}
-        #word_dict maintains occurence of each word within a specific tag
-        self.word_dict = {"adj": {'total':0}, "adv": {'total':0}, "adp": {'total':0}, "conj": {'total':0}, "det": {'total':0}, "noun": {'total':0}, "num": {'total':0}, "pron": {'total':0},"prt": {'total':0}, "verb": {'total':0}, "x": {'total':0}, ".": {'total':0}}
-        #priors computes the number of time a tag occurs in testing data i.e. #adj/total
-        self.priors={}
-        #intial_tags stores the number of times a part of speech tag occurs at the start of a sentence
-        self.initial_tags={"adj": 0, "adv": 0, "adp": 0, "conj": 0, "det": 0, "noun": 0, "num": 0, "pron": 0, "prt": 0,"verb": 0, "x": 0, ".": 0, "total": 0}
-        #initial probabilities are computed and stored here as initial_tag=def/total number of initial tags from above dictionary
-        self.initial_state_distribution={"adj": 0, "adv": 0, "adp": 0, "conj": 0, "det": 0, "noun": 0, "num": 0, "pron": 0, "prt": 0,"verb": 0, "x": 0, ".": 0, "total": 0}
-        #number of times a given tag(the key here) is preceeded by another PoS tag. To compute P(X2=Det|X1=Noun)
-        self.state_transitions = {"adj": {'total':0}, "adv": {'total':0}, "adp": {'total':0}, "conj": {'total':0}, "det": {'total':0}, "noun": {'total':0}, "num": {'total':0}, "pron": {'total':0},"prt": {'total':0}, "verb": {'total':0}, "x": {'total':0}, ".": {'total':0}}
-        #Graph for viterbi algorithm
-        self.adjacency_list={'Source':[]}
+        # Setting up the tags
+        self.tags = ["adj", "adv", "adp", "conj", "det", "noun", "num", "pron", "prt", "verb", "x", "."]
+        self.undef_prob = 0.00000000001
+        self.tag_dict = {"total": self.undef_prob}
+        self.word_dict ={}
+        self.initial_tags = {"total": self.undef_prob}
+        self.initial_state_distribution = {}
+        self.state_transitions = {}
+
+        for tag in self.tags:
+            # tag_dict maintains count of occurrences of each tag and the total number of tags
+            self.tag_dict[tag] = self.undef_prob
+
+            # word_dict maintains occurrence of each word within a specific tag
+            self.word_dict[tag] = {}
+            self.word_dict[tag]["total"] = self.undef_prob
+
+            # intial_tags stores the number of times a part of speech tag occurs at the start of a sentence
+            self.initial_tags[tag] = self.undef_prob
+
+            # initial probabilities are computed and stored here as initial_tag=def/total
+            # number of initial tags from above dictionary
+            self.initial_state_distribution[tag] = self.undef_prob
+
+            # number of times a given tag(the key here) is preceded by another PoS tag. To compute P(X2=Det|X1=Noun)
+            self.state_transitions[tag] = {}
+            self.state_transitions[tag]["total"] = self.undef_prob
+
+        # priors computes the number of time a tag occurs in testing data i.e. #adj/total
+        self.priors = {}
+
+        # Graph for viterbi algorithm
+        self.adjacency_list = {'0': {}}
+
     # Calculate the log of the posterior probability of a given sentence
     #  with a given part-of-speech labelingif str(word) in self.word_dict["adj"]:
+
     def posterior(self, sentence, label):
-        return 0
+        total = 0.0
+        prev_tag = None
+        prob = 0.0
+        for word, tag in zip(sentence, label):
+
+            if not prev_tag:
+                if word in self.word_dict[tag]:
+                    prob += -math.log(self.initial_state_distribution[tag] *
+                                      self.word_dict[tag][word] / self.word_dict[tag]["total"])
+                else:
+                    prob += -math.log(self.initial_state_distribution[tag] *
+                                      self.undef_prob)
+
+                prev_tag = tag
+            else:
+                if word in self.word_dict[tag]:
+                    prob += -math.log(self.state_transitions[tag][prev_tag] /
+                                      self.state_transitions[tag]["total"] *
+                                      self.word_dict[tag][word] / self.word_dict[tag]["total"])
+                else:
+                    prob += -math.log(self.state_transitions[tag][prev_tag] /
+                                      self.state_transitions[tag]["total"] *
+                                      0.0000000001)
+                prev_tag = tag
+            total += prob
+        return -prob
 
     # Do the training!
     #
     def train(self, data):
 
         for line in data:
-            self.initial_tags[line[1][0]]+=1
-            self.initial_tags['total']+=1
-            for word,tag in zip(line[0],line[1]):
-                self.tag_dict[tag]+=1
-                self.tag_dict["total"]+=1
+            self.initial_tags[line[1][0]] += 1
+            self.initial_tags["total"] += 1
+            for word, tag in zip(line[0], line[1]):
+                self.tag_dict[tag] += 1
+                self.tag_dict["total"] += 1
 
                 if word in self.word_dict[tag]:
-                    self.word_dict[tag][word]+=1
-                    self.word_dict[tag]['total']+=1
+                    self.word_dict[tag][word] += 1
+                    self.word_dict[tag]["total"] += 1
                 else:
-                    self.word_dict[tag][word]=1
-                    self.word_dict[tag]['total'] += 1
-            #training transition probabilities
-            for index,tag in enumerate(line[1]):
-                if index>0:
+                    self.word_dict[tag][word] = 1
+                    self.word_dict[tag]["total"] += 1
+
+            # training transition probabilities
+            for index, tag in enumerate(line[1]):
+                if index > 0:
                     if line[1][index-1] in self.state_transitions[tag]:
-                        self.state_transitions[tag][line[1][index-1]]+=1
-                        self.state_transitions[tag]['total'] += 1
+                        self.state_transitions[tag][line[1][index-1]] += 1
+                        self.state_transitions[tag]["total"] += 1
                     else:
                         self.state_transitions[tag][line[1][index - 1]] = 1
-                        self.state_transitions[tag]['total'] += 1
+                        self.state_transitions[tag]["total"] += 1
 
-
-        for key in ["adj", "adv", "adp", "conj", "det", "noun", "num", "pron", "prt", "verb", "x", "."]:
+        for key in self.tags:
             self.priors[key]=self.tag_dict[key]/self.tag_dict["total"]
-            self.initial_state_distribution[key]=self.initial_tags[key]/self.initial_tags['total']
+            self.initial_state_distribution[key]=self.initial_tags[key]/self.initial_tags["total"]
 
-        print(self.tag_dict)
-        print(self.word_dict)
-        print(self.priors)
-        print(self.initial_tags)
-        print(self.initial_state_distribution)
-        print(self.state_transitions)
-
-        # word_dict={"adj":{"total":0}, "adv":{"total":0}, "adp":{"total":0}, "conj":{"total":0}, "det":{"total":0}, "noun":{"total":0}, "num":{"total":0}, "pron":{"total":0}, "prt":{"total":0}, "verb":{"total":0}, "x":{"total":0}, ".":{"total":0}}
-
+        # print(self.tag_dict)
+        # print(self.word_dict)
+        # print(self.priors)
+        # print(self.initial_tags)
+        # print(self.initial_state_distribution)
+        # print(self.state_transitions)
 
     # Functions for each algorithm.
     #
     def simplified(self, sentence):
-        final_pos=[]
+        final_pos = []
         for word in sentence:
-            pos={"adj":0, "adv":0, "adp":0, "conj":0, "det":0, "noun":0, "num":0, "pron":0, "prt":0, "verb":0, "x":0, ".":0}
-            for key in ["adj","adv","adp","conj","det","noun","num","pron","prt","verb","x","."]:
+            pos = {}
+            for tag in self.tags:
+                pos[tag] = 100000
+            for key in self.tags:
                 if str(word) in self.word_dict[key]:
-                    P=(self.word_dict[key][str(word)]/self.word_dict[key]['total'])*self.priors[key]
+                    P = - math.log(self.word_dict[key][str(word)]/self.word_dict[key]["total"]) \
+                        - math.log(self.priors[key])
                 else:
-                    P=0
-                pos[key]=P
-            final_pos.append(max(pos.items(), key=operator.itemgetter(1))[0])
-        print(final_pos)
-        return (final_pos)
+                    P = -math.log(self.undef_prob)
+                pos[key] = P
+            final_pos.append(min(pos.items(), key=operator.itemgetter(1))[0])
+        # print(final_pos)
+        return final_pos
 
     def hmm_ve(self, sentence):
+        ans = []
+        first = True
+        tau = 0.0
+        prev_tag = None
+        for word in sentence:
+            max_tau = 1000
+            max_prev_tag = None
 
-        return [ "noun" ] * len(sentence)
+            for key in self.tags:
+                if first:
+                    if word in self.word_dict[key]:
+                        prob = -math.log(self.initial_state_distribution[key] *
+                                         self.word_dict[key][word] / self.word_dict[key]["total"])
+                    else:
+                        prob = -math.log(self.initial_state_distribution[key]) - math.log(self.undef_prob)
+
+                    if prob < max_tau:
+                        max_tau = prob
+                        max_prev_tag = key
+
+                else:
+
+                    if word in self.word_dict[key]:
+                        if prev_tag in self.state_transitions[key]:
+                            prob = - math.log(self.state_transitions[key][prev_tag] / 
+                                              self.state_transitions[key]["total"]) \
+                                   - math.log(self.word_dict[key][word] / 
+                                              self.word_dict[key]["total"]) + tau
+                        else:
+                            prob = - math.log(self.undef_prob) \
+                                   - math.log(self.word_dict[key][word] / 
+                                              self.word_dict[key]["total"]) + tau
+                    else:
+                        if prev_tag in self.state_transitions[key]:
+                            prob = - math.log(self.state_transitions[key][prev_tag] / 
+                                              self.state_transitions[key]["total"]) \
+                                   - math.log(self.undef_prob) + tau
+                        else:
+                            prob = - math.log(self.undef_prob) \
+                                   - math.log(self.undef_prob) + tau
+
+                    if prob < max_tau:
+                        max_tau = prob
+                        max_prev_tag = key
+
+            tau = max_tau
+            prev_tag = max_prev_tag
+            ans.append(prev_tag)
+
+            first = False
+        return ans
 
     def hmm_viterbi(self, sentence):
-        # for word in sentence:
-        #     for key in ["adj","adv","adp","conj","det","noun","num","pron","prt","verb","x","."]:
-        #         self.adjacency_list['Source']=(key,-math.log(self.initial_state_distribution[key])-math.log(self.word_dict[key][str(word)]))
-        return [ "noun" ] * len(sentence)
+        # PoS = []
+        for key in self.tags:
+            if sentence[0] in self.word_dict[key]:
+                self.adjacency_list['0'][key] = (-math.log(self.initial_state_distribution[key]) - math.log(
+                    self.word_dict[key][str(sentence[0])] / self.tag_dict[key]), 'Source')
+            else:
+                self.adjacency_list['0'][key] = (
+                    -math.log(self.initial_state_distribution[key]) - math.log(self.undef_prob), 'Source')
 
+        for i in range(1, len(sentence)):
+            self.adjacency_list[str(i)] = {}
+
+            for key in self.tags:
+                adj_list = []
+                for k in self.tags:
+                    if sentence[i] in self.word_dict[key]:
+                        if k not in self.state_transitions[key]:
+                            self.state_transitions[key][k] = self.undef_prob
+                        adj_list.append((self.adjacency_list[str(i - 1)][k][0] -
+                                         math.log(self.state_transitions[key][k] /
+                                                  self.state_transitions[key]['total']) -
+                                         math.log(self.word_dict[key][str(sentence[i])] /
+                                                  self.tag_dict[key]), k, sentence[i]))
+                    else:
+                        if k not in self.state_transitions[key]:
+                            self.state_transitions[key][k] = self.undef_prob
+                        adj_list.append((self.adjacency_list[str(i - 1)][k][0] -
+                                         math.log(self.state_transitions[key][k] /
+                                                  self.state_transitions[key]['total']) -
+                                         math.log(self.undef_prob), k, sentence[i]))
+                heapq.heapify(adj_list)
+                self.adjacency_list[str(i)][key] = heapq.heappop(adj_list)
+        PoS = []
+        final_PoS = []
+        for i in range(0, len(sentence), 1):
+            if i == 0:
+                PoS.append(min(self.adjacency_list[str(len(sentence) - 1 - i)].items(), key=operator.itemgetter(1)))
+            else:
+                PoS.append((PoS[-1][1][1], self.adjacency_list[str(len(sentence) - 1 - i)][PoS[-1][1][1]]))
+        for values in PoS:
+            final_PoS.append(values[0])
+        # print(final_PoS)
+        return final_PoS[::-1]
 
     # This solve() method is called by label.py, so you should keep the interface the
     #  same, but you can change the code itself. 
@@ -123,4 +256,3 @@ class Solver:
             return self.hmm_viterbi(sentence)
         else:
             print("Unknown algo!")
-

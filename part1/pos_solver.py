@@ -2,15 +2,30 @@
 # CS B551 Fall 2017, Assignment #3
 #
 # Your names and user ids:
+#   Roshith Raghvan- roragh
+#   Vaibhav Shah- vaivshah
 #
 # (Based on skeleton code by D. Crandall)
 #
 #
 ####
-# Put your report here!!
+# We used the Brown corpus training data to train our models. From these the transitions probabilities, emission
+# probabilities and initial probability distribution were computed and stored to dictionaries.
+# When a word is found in test file but not in training file it is given a default probability of 0.0000000000001
+# We are converting the probabilities to negative log and then minimizing cost instead of maximizing probabilities.
+# In variable elimination, we traverse from the nodes with maximum probability. When traversing we take the product of
+# the posterior of the node along with its transition to a node in the next interval in time.
+# In viterbi, we are using graph traversal from the most likely final word tag and traversing to preceding nodes in the
+# chain. Cost minimization in viterbi is accomplished through min heap pop operation.
+# For viterbi, Triple nested dictionary is used to represent the graph.
+#
+# Word tagging Accuracy when measured against bc.test:
+# Simplified: 92.10%  HMM VE: 91.79%  HMM MAP: 95.18%
+#
+# Sentence accuracy with three inference approaches when measured against bc,test:
+# Simplified: 39.25%  HMM VE: 38.90%   HMM MAP: 55.30%?
 ####
 import heapq
-import random
 import math
 import operator
 
@@ -56,7 +71,7 @@ class Solver:
         self.adjacency_list = {'0': {}}
 
     # Calculate the log of the posterior probability of a given sentence
-    #  with a given part-of-speech labelingif str(word) in self.word_dict["adj"]:
+    #  with a given part-of-speech labeling if str(word) in self.word_dict["adj"]:
 
     def posterior(self, sentence, label):
         total = 0.0
@@ -118,12 +133,6 @@ class Solver:
             self.priors[key] = self.tag_dict[key]/self.tag_dict["total"]
             self.initial_state_distribution[key] = self.initial_tags[key]/self.initial_tags["total"]
 
-        # print(self.tag_dict)
-        # print(self.word_dict)
-        # print(self.priors)
-        # print(self.initial_tags)
-        # print(self.initial_state_distribution)
-        # print(self.state_transitions)
 
     # Functions for each algorithm.
     #
@@ -198,7 +207,6 @@ class Solver:
         return ans
 
     def hmm_viterbi(self, sentence):
-        # PoS = []
         for key in self.tags:
             if sentence[0] in self.word_dict[key]:
                 self.adjacency_list['0'][key] = (-math.log(self.initial_state_distribution[key]) - math.log(
